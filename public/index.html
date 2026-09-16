@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>MEAN + OpenClaw Health Dashboard</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 30px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 35px;
+    }
+
+    .header h1 {
+      margin: 0 0 10px;
+      font-size: 32px;
+    }
+
+    .header p {
+      margin: 0;
+      color: #94a3b8;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 18px;
+      padding: 8px 16px;
+      border-radius: 30px;
+      background: #1e293b;
+      font-size: 14px;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #64748b;
+    }
+
+    .status-dot.online {
+      background: #22c55e;
+      box-shadow: 0 0 10px #22c55e;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 18px;
+      padding: 25px;
+      text-align: center;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+    }
+
+    .card h2 {
+      margin: 0 0 20px;
+      font-size: 19px;
+    }
+
+    .gauge {
+      position: relative;
+      width: 180px;
+      height: 90px;
+      margin: 0 auto 20px;
+      overflow: hidden;
+    }
+
+    .gauge-bg {
+      position: absolute;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: conic-gradient(
+        from 270deg,
+        #ef4444 0deg,
+        #f59e0b 45deg,
+        #22c55e 90deg,
+        #22c55e 180deg,
+        transparent 180deg
+      );
+    }
+
+    .gauge-inner {
+      position: absolute;
+      width: 130px;
+      height: 130px;
+      left: 25px;
+      top: 25px;
+      border-radius: 50%;
+      background: #1e293b;
+    }
+
+    .needle {
+      position: absolute;
+      width: 3px;
+      height: 70px;
+      left: 88px;
+      top: 20px;
+      background: #f8fafc;
+      transform-origin: bottom center;
+      transform: rotate(-90deg);
+      transition: transform 0.7s ease;
+      border-radius: 3px;
+      z-index: 5;
+    }
+
+    .needle-center {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #f8fafc;
+      border-radius: 50%;
+      left: 84px;
+      top: 78px;
+      z-index: 6;
+    }
+
+    .gauge-value {
+      font-size: 26px;
+      font-weight: bold;
+      margin-top: -5px;
+    }
+
+    .connection {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #94a3b8;
+    }
+
+    .connection.success {
+      color: #4ade80;
+    }
+
+    .connection.error {
+      color: #f87171;
+    }
+
+    .details {
+      margin-top: 30px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 18px;
+      padding: 25px;
+    }
+
+    .details h2 {
+      margin-top: 0;
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid #334155;
+      gap: 20px;
+    }
+
+    .row:last-child {
+      border-bottom: 0;
+    }
+
+    .label {
+      color: #94a3b8;
+    }
+
+    .value {
+      font-family: monospace;
+      text-align: right;
+    }
+
+    .refresh {
+      display: block;
+      margin: 25px auto 0;
+      padding: 11px 22px;
+      border: 0;
+      border-radius: 10px;
+      background: #3b82f6;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .refresh:hover {
+      background: #2563eb;
+    }
+
+    @media (max-width: 800px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="header">
+
+    <h1>MEAN + OpenClaw</h1>
+
+    <p>Backend Connection & Health Dashboard</p>
+
+    <div class="status">
+      <span id="overallDot" class="status-dot"></span>
+      <span id="overallStatus">Checking connections...</span>
+    </div>
+
+  </div>
+
+  <div class="grid">
+
+    <!-- EXPRESS -->
+
+    <div class="card">
+
+      <h2>Express API</h2>
+
+      <div class="gauge">
+        <div class="gauge-bg"></div>
+        <div class="gauge-inner"></div>
+
+        <div
+          id="expressNeedle"
+          class="needle">
+        </div>
+
+        <div class="needle-center"></div>
+      </div>
+
+      <div id="expressValue" class="gauge-value">
+        Checking...
+      </div>
+
+      <div id="expressStatus" class="connection">
+        Testing API
+      </div>
+
+    </div>
+
+    <!-- MONGODB -->
+
+    <div class="card">
+
+      <h2>MongoDB</h2>
+
+      <div class="gauge">
+        <div class="gauge-bg"></div>
+        <div class="gauge-inner"></div>
+
+        <div
+          id="mongoNeedle"
+          class="needle">
+        </div>
+
+        <div class="needle-center"></div>
+      </div>
+
+      <div id="mongoValue" class="gauge-value">
+        Checking...
+      </div>
+
+      <div id="mongoStatus" class="connection">
+        Testing database
+      </div>
+
+    </div>
+
+    <!-- OPENCLAW -->
+
+    <div class="card">
+
+      <h2>OpenClaw</h2>
+
+      <div class="gauge">
+        <div class="gauge-bg"></div>
+        <div class="gauge-inner"></div>
+
+        <div
+          id="openclawNeedle"
+          class="needle">
+        </div>
+
+        <div class="needle-center"></div>
+      </div>
+
+      <div id="openclawValue" class="gauge-value">
+        Checking...
+      </div>
+
+      <div id="openclawStatus" class="connection">
+        Testing Gateway
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="details">
+
+    <h2>System Details</h2>
+
+    <div class="row">
+      <span class="label">Frontend</span>
+      <span class="value">Angular</span>
+    </div>
+
+    <div class="row">
+      <span class="label">Backend</span>
+      <span class="value">Node.js + Express :3000</span>
+    </div>
+
+    <div class="row">
+      <span class="label">Database</span>
+      <span id="mongoDetail" class="value">
+        Checking...
+      </span>
+    </div>
+
+    <div class="row">
+      <span class="label">OpenClaw Gateway</span>
+      <span id="openclawDetail" class="value">
+        127.0.0.1:18789
+      </span>
+    </div>
+
+    <div class="row">
+      <span class="label">OpenClaw Model</span>
+      <span id="modelDetail" class="value">
+        Checking...
+      </span>
+    </div>
+
+    <div class="row">
+      <span class="label">Last Check</span>
+      <span id="lastCheck" class="value">
+        --
+      </span>
+    </div>
+
+  </div>
+
+  <button
+    class="refresh"
+    onclick="checkAll()">
+    Refresh Connections
+  </button>
+
+</div>
+
+<script>
+
+  function setGauge(needleId, value) {
+
+    const needle =
+      document.getElementById(needleId);
+
+    const percentage =
+      Math.max(0, Math.min(100, value));
+
+    const rotation =
+      -90 + (percentage * 1.8);
+
+    needle.style.transform =
+      `rotate(${rotation}deg)`;
+  }
+
+
+  function setStatus(
+    valueId,
+    statusId,
+    needleId,
+    healthy,
+    valueText,
+    statusText
+  ) {
+
+    document.getElementById(valueId)
+      .textContent = valueText;
+
+    const status =
+      document.getElementById(statusId);
+
+    status.textContent = statusText;
+
+    status.className =
+      `connection ${healthy ? 'success' : 'error'}`;
+
+    setGauge(
+      needleId,
+      healthy ? 100 : 5
+    );
+  }
+
+
+  /*
+   * ============================================================
+   * EXPRESS CHECK
+   * ============================================================
+   *
+   * Only checks whether Express/backend is responding.
+   */
+
+  async function checkExpress() {
+
+    const start = performance.now();
+
+    try {
+
+      const response =
+        await fetch('/api/health');
+
+      if (!response.ok) {
+        throw new Error('Backend returned an error');
+      }
+
+      const data =
+        await response.json();
+
+      if (data.backend !== true) {
+        throw new Error('Backend unavailable');
+      }
+
+      const elapsed =
+        Math.round(performance.now() - start);
+
+      setStatus(
+        'expressValue',
+        'expressStatus',
+        'expressNeedle',
+        true,
+        `${elapsed} ms`,
+        'Connected'
+      );
+
+      return true;
+
+    } catch (error) {
+
+      console.error(
+        'Express check failed:',
+        error
+      );
+
+      setStatus(
+        'expressValue',
+        'expressStatus',
+        'expressNeedle',
+        false,
+        'OFFLINE',
+        'Connection failed'
+      );
+
+      return false;
+    }
+  }
+
+
+  /*
+   * ============================================================
+   * MONGODB CHECK
+   * ============================================================
+   */
+
+  async function checkMongo() {
+
+    try {
+
+      const response =
+        await fetch('/api/health');
+
+      if (!response.ok) {
+        throw new Error('Health endpoint failed');
+      }
+
+      const data =
+        await response.json();
+
+      if (data.mongodb === true) {
+
+        setStatus(
+          'mongoValue',
+          'mongoStatus',
+          'mongoNeedle',
+          true,
+          '100%',
+          'Connected'
+        );
+
+        document.getElementById('mongoDetail')
+          .textContent = 'Connected';
+
+        return true;
+      }
+
+      throw new Error('MongoDB unavailable');
+
+    } catch (error) {
+
+      console.error(
+        'MongoDB check failed:',
+        error
+      );
+
+      setStatus(
+        'mongoValue',
+        'mongoStatus',
+        'mongoNeedle',
+        false,
+        'OFFLINE',
+        'Not connected'
+      );
+
+      document.getElementById('mongoDetail')
+        .textContent = 'Unavailable';
+
+      return false;
+    }
+  }
+
+
+  /*
+   * ============================================================
+   * OPENCLAW CHECK
+   * ============================================================
+   */
+
+  async function checkOpenClaw() {
+
+    const start = performance.now();
+
+    try {
+
+      const response =
+        await fetch('/api/openclaw/models');
+
+      if (!response.ok) {
+        throw new Error('OpenClaw API returned an error');
+      }
+
+      const data =
+        await response.json();
+
+      if (
+        data.success !== true ||
+        !data.data ||
+        !Array.isArray(data.data.data)
+      ) {
+        throw new Error('Invalid OpenClaw response');
+      }
+
+      const elapsed =
+        Math.round(performance.now() - start);
+
+      setStatus(
+        'openclawValue',
+        'openclawStatus',
+        'openclawNeedle',
+        true,
+        `${elapsed} ms`,
+        'Connected'
+      );
+
+      const models =
+        data.data.data
+          .map(model => model.id)
+          .join(', ');
+
+      document.getElementById('modelDetail')
+        .textContent =
+          models || 'openclaw/default';
+
+      return true;
+
+    } catch (error) {
+
+      console.error(
+        'OpenClaw check failed:',
+        error
+      );
+
+      setStatus(
+        'openclawValue',
+        'openclawStatus',
+        'openclawNeedle',
+        false,
+        'OFFLINE',
+        'Connection failed'
+      );
+
+      document.getElementById('modelDetail')
+        .textContent = 'Unavailable';
+
+      return false;
+    }
+  }
+
+
+  /*
+   * ============================================================
+   * CHECK EVERYTHING
+   * ============================================================
+   */
+
+  async function checkAll() {
+
+    document.getElementById('overallStatus')
+      .textContent = 'Checking connections...';
+
+    document.getElementById('overallDot')
+      .className = 'status-dot';
+
+    const results =
+      await Promise.all([
+        checkExpress(),
+        checkMongo(),
+        checkOpenClaw()
+      ]);
+
+    const allHealthy =
+      results.every(Boolean);
+
+    const overallDot =
+      document.getElementById('overallDot');
+
+    overallDot.className =
+      `status-dot ${allHealthy ? 'online' : ''}`;
+
+    document.getElementById('overallStatus')
+      .textContent =
+        allHealthy
+          ? 'All systems connected'
+          : 'One or more systems unavailable';
+
+    document.getElementById('lastCheck')
+      .textContent =
+        new Date().toLocaleTimeString();
+  }
+
+
+  /*
+   * Initial check
+   */
+
+  checkAll();
+
+</script>
+
+</body>
+</html>
