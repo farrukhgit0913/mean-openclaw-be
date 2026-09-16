@@ -189,6 +189,75 @@ app.post(
 
 /**
  * ============================================================
+ * WHATSAPP SEND
+ * ============================================================
+ */
+
+app.post(
+  '/api/openclaw/whatsapp/send',
+  async (req, res) => {
+    try {
+      const { to, message } = req.body;
+
+      if (
+        !to ||
+        typeof to !== 'string'
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'to is required'
+        });
+      }
+
+      if (
+        !message ||
+        typeof message !== 'string'
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'message is required'
+        });
+      }
+
+      /**
+       * WhatsApp phone number in E.164 format.
+       * Example: +923062762437
+       */
+      if (!/^\+\d{8,15}$/.test(to)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            'to must be a valid E.164 phone number'
+        });
+      }
+
+      const response =
+        await openClawService.sendWhatsAppMessage(
+          to,
+          message
+        );
+
+      return res.json({
+        success: true,
+        data: response
+      });
+    } catch (error) {
+      console.error(
+        'WhatsApp send error:',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          'Failed to send WhatsApp message'
+      });
+    }
+  }
+);
+
+/**
+ * ============================================================
  * EXPORT
  * ============================================================
  */

@@ -15,4 +15,14 @@ export class OpenClawService {
       }
     ]);
   }
+
+  async sendWhatsAppMessage(
+    to: string,
+    message: string
+  ) {
+    return this.client.sendWhatsAppMessage(
+      to,
+      message
+    );
+  }
 }
