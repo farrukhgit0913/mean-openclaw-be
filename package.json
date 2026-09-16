@@ -23,7 +23,9 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.10.1",
     "morgan": "^1.12.1",
-    "openclaw": "^2026.9.4"
+    "openclaw": "^2026.9.4",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -32,6 +34,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^22.20.3",
+    "@types/socket.io": "^3.0.1",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }
