@@ -28,9 +28,9 @@ async function bootstrap(): Promise<void> {
   /**
    * Initialize Socket.IO.
    */
-  initializeSocket(
-    httpServer
-  );
+  // initializeSocket(
+  //   httpServer
+  // );
 
   /**
    * Start server.
