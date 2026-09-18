@@ -1,174 +1,173 @@
+import { executeCustomerTool } from "../../tools/customer.tools.js";
 import { OpenClawClient } from "./openclaw.client.js";
 
-import {
-  customerTools,
-  executeCustomerTool,
-} from "../../tools/customer.tools.js";
-
 export class OpenClawAgentService {
-  private readonly client = new OpenClawClient();
-
-  private readonly tools = customerTools;
+  private readonly openClawClient = new OpenClawClient();
 
   async chat(userMessage: string) {
-    const messages: any[] = [
-      {
-        role: "system",
+    const message = userMessage.toLowerCase().trim();
 
-        content: `
-You are an AI CRM business assistant.
+    let toolName: string | null = null;
+    let args: Record<string, unknown> = {};
 
-You have access to CRM tools provided directly by the application.
+    // 1. Customer count
+    if (
+      message.includes("how many customers") ||
+      message.includes("customer count") ||
+      message.includes("total customers")
+    ) {
+      toolName = "getCustomerCount";
+    }
 
-IMPORTANT RULES:
+    // 2. Vehicle searches
+    else if (
+      message.includes("toyota") ||
+      message.includes("honda") ||
+      message.includes("kia")
+    ) {
+      const makes = ["toyota", "honda", "kia"];
 
-1. Use the provided CRM tools whenever the user asks for
-   customer information or wants to perform a CRM action.
+      const make = makes.find((item) => message.includes(item));
 
-2. Do NOT use tool_search.
+      toolName = "searchCustomers";
 
-3. Do NOT invent customer information.
+      args = {
+        query: make ?? "",
+      };
+    }
 
-4. Do NOT claim that an action was completed unless the
-   corresponding tool returned a successful result.
-
-5. Select the appropriate CRM tool based on the user's request.
-
-6. After receiving a tool result, explain the result clearly
-   to the user.
-
-Available CRM capabilities:
-- Count customers
-- Search customers
-
-The application will execute your requested tool calls.
-        `.trim(),
-      },
-
-      {
-        role: "user",
-        content: userMessage,
-      },
-    ];
-
-    const maxIterations = 5;
-    const executedToolCalls: Array<{
-      name: string;
-      arguments: Record<string, unknown>;
-      result: unknown;
-    }> = [];
-
-    for (let iteration = 0; iteration < maxIterations; iteration++) {
-      const response = await this.client.chatWithTools(
-        messages,
-        this.tools,
+    // 3. Customer details / name lookup
+    else if (
+      message.includes("find ") ||
+      message.includes("customer ") ||
+      message.includes("contact") ||
+      message.includes("details")
+    ) {
+      const match = userMessage.match(
+        /(?:find|customer|contact(?:\s+details)?(?:\s+for)?)\s+(.+?)(?:\s+and\s+give.*)?$/i,
       );
 
-      console.log("\n===== OPENCLAW RAW RESPONSE =====");
-      console.log(JSON.stringify(response, null, 2));
-      console.log("=================================\n");
+      toolName = "searchCustomers";
 
-      const choice = response?.choices?.[0];
+      args = {
+        query: match?.[1]?.trim() || userMessage.trim(),
+      };
+    }
 
-      if (!choice) {
-        throw new Error("OpenClaw returned no choices.");
-      }
+    // 4. Everything else → Ollama/OpenClaw
+    if (!toolName) {
+      await this.sleep(1200);
 
-      const assistantMessage = choice.message;
+      const result = await this.openClawClient.chat([
+        {
+          role: "system",
+          content:
+            "You are a helpful AI assistant. Answer the user's question clearly and concisely.",
+        },
+        {
+          role: "user",
+          content: userMessage,
+        },
+      ]);
 
-      messages.push(assistantMessage);
+      return {
+        success: true,
+        message:
+          result?.choices?.[0]?.message?.content ??
+          "I couldn't generate a response.",
+        toolCalls: [],
+      };
+    }
 
-      /*
-       * Normal final response from the model.
-       */
-      if (
-        !assistantMessage.tool_calls?.length ||
-        choice.finish_reason !== "tool_calls"
-      ) {
-        return {
-          success: true,
-          message: assistantMessage.content ?? "",
-          toolCalls: executedToolCalls,
-        };
-      }
+    // Execute CRM tool
+    const result = await executeCustomerTool(toolName, args);
 
-      /*
-       * Execute every tool requested by the model.
-       */
-      for (const toolCall of assistantMessage.tool_calls) {
-        const toolName = toolCall.function.name;
+    await this.sleep(1200);
 
-        let args: Record<string, unknown> = {};
+    if (!result.success) {
+      return {
+        success: false,
+        message: result.message,
+        toolCalls: [
+          {
+            name: toolName,
+            arguments: args,
+            result,
+          },
+        ],
+      };
+    }
 
-        try {
-          args = JSON.parse(
-            toolCall.function.arguments || "{}",
-          );
-        } catch (error) {
-          console.error(
-            "Failed to parse tool arguments:",
-            toolCall.function.arguments,
-          );
+    let response = "";
 
-          messages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: JSON.stringify({
-              success: false,
-              message: "Invalid tool arguments.",
-            }),
-          });
+    // Customer count response
+    if (toolName === "getCustomerCount") {
+      response = `There are ${result.count} customers in the CRM.`;
+    }
 
-          continue;
+    // Search response
+    if (toolName === "searchCustomers" && "customers" in result) {
+      const customers = result.customers as any[];
+
+      if (!customers.length) {
+        response = "I couldn't find any matching customers.";
+      } else {
+        const wantsDetails =
+          message.includes("contact") ||
+          message.includes("details") ||
+          message.includes("phone") ||
+          message.includes("email");
+
+        if (wantsDetails && customers.length === 1) {
+          const customer = customers[0];
+
+          const vehicle = customer.vehicle
+            ? `${customer.vehicle.make ?? ""} ${
+                customer.vehicle.model ?? ""
+              }${customer.vehicle.year ? ` (${customer.vehicle.year})` : ""}`.trim()
+            : "No vehicle information";
+
+          response = [
+            customer.name,
+            "",
+            `Phone: ${customer.phone ?? "Not available"}`,
+            `Email: ${customer.email ?? "Not available"}`,
+            `Vehicle: ${vehicle}`,
+          ].join("\n");
+        } else {
+          response = customers
+            .map((customer) => {
+              const vehicle = customer.vehicle
+                ? `${customer.vehicle.make ?? ""} ${
+                    customer.vehicle.model ?? ""
+                  }${
+                    customer.vehicle.year
+                      ? ` (${customer.vehicle.year})`
+                      : ""
+                  }`.trim()
+                : "No vehicle";
+
+              return `${customer.name} — ${vehicle}`;
+            })
+            .join("\n");
         }
-
-        console.log("AI requested tool:", {
-          name: toolName,
-          arguments: args,
-        });
-
-        let result: unknown;
-
-        try {
-          /*
-           * All CRM tools are executed through the same
-           * application tool executor.
-           */
-          result = await executeCustomerTool(
-            toolName,
-            args,
-          );
-        } catch (error) {
-          console.error(
-            `Tool execution failed: ${toolName}`,
-            error,
-          );
-
-          result = {
-            success: false,
-            message:
-              error instanceof Error
-                ? error.message
-                : "Tool execution failed.",
-          };
-        }
-
-        executedToolCalls.push({
-          name: toolName,
-          arguments: args,
-          result,
-        });
-
-        messages.push({
-          role: "tool",
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(result),
-        });
       }
     }
 
-    throw new Error(
-      "AI agent exceeded the maximum tool-call iterations.",
-    );
+    return {
+      success: true,
+      message: response,
+      toolCalls: [
+        {
+          name: toolName,
+          arguments: args,
+          result,
+        },
+      ],
+    };
+  }
+
+  private sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

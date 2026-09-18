@@ -1,19 +1,21 @@
 {
   "id": "crm-tools",
   "name": "CRM Tools",
-  "description": "Add CRM Tools tools to OpenClaw.",
+  "description": "CRM customer tools backed by the backend API.",
   "version": "0.1.0",
   "configSchema": {
     "type": "object",
-    "additionalProperties": false,
-    "properties": {}
+    "properties": {},
+    "additionalProperties": false
   },
   "activation": {
     "onStartup": true
   },
   "contracts": {
     "tools": [
-      "echo"
+      "getCustomerCount",
+      "searchCustomers",
+      "getCustomer"
     ]
   }
 }
