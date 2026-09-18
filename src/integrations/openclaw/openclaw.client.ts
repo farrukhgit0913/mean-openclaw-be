@@ -1,6 +1,8 @@
-import axios, { AxiosInstance } from 'axios';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import axios, { AxiosInstance } from "axios";
+
+import { execFile } from "node:child_process";
+
+import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
@@ -10,73 +12,105 @@ export class OpenClawClient {
   constructor() {
     this.client = axios.create({
       baseURL: process.env.OPENCLAW_BASE_URL,
+
       headers: {
         Authorization: `Bearer ${process.env.OPENCLAW_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
+
+        "Content-Type": "application/json",
+      },
     });
   }
 
   async getModels() {
-    const response = await this.client.get('/v1/models');
+    const response = await this.client.get("/v1/models");
+
     return response.data;
   }
 
   async chat(
     messages: Array<{
-      role: 'system' | 'user' | 'assistant';
+      role: "system" | "user" | "assistant";
+
       content: string;
-    }>
+    }>,
   ) {
-    const response = await this.client.post('/v1/chat/completions', {
+    const response = await this.client.post("/v1/chat/completions", {
       model: process.env.OPENCLAW_MODEL,
-      messages
+
+      messages,
     });
 
     return response.data;
   }
 
-  async sendWhatsAppMessage(
-    to: string,
-    message: string
-  ) {
-    const openClawCli =
-      process.env.OPENCLAW_CLI_PATH || 'openclaw';
+  async chatWithTools(
+    messages: Array<{
+      role: "system" | "user" | "assistant" | "tool";
 
-    const { stdout, stderr } =
-      await execFileAsync(
-        openClawCli,
-        [
-          'message',
-          'send',
-          '--channel',
-          'whatsapp',
-          '--target',
-          to,
-          '--message',
-          message
-        ],
-        {
-          timeout: 30_000,
-          maxBuffer: 1024 * 1024
-        }
-      );
+      content: string | null;
+
+      tool_call_id?: string;
+
+      tool_calls?: Array<{
+        id: string;
+
+        type: "function";
+
+        function: {
+          name: string;
+          arguments: string;
+        };
+      }>;
+    }>,
+
+    tools: unknown[],
+  ) {
+    const response = await this.client.post("/v1/chat/completions", {
+      model: process.env.OPENCLAW_MODEL,
+
+      messages,
+
+      tools,
+
+      tool_choice: "auto",
+    });
+
+    return response.data;
+  }
+
+  async sendWhatsAppMessage(to: string, message: string) {
+    const openClawCli = process.env.OPENCLAW_CLI_PATH || "openclaw";
+
+    const { stdout, stderr } = await execFileAsync(
+      openClawCli,
+      [
+        "message",
+        "send",
+        "--channel",
+        "whatsapp",
+        "--target",
+        to,
+        "--message",
+        message,
+      ],
+      {
+        timeout: 30_000,
+        maxBuffer: 1024 * 1024,
+      },
+    );
 
     if (stderr) {
-      console.warn(
-        'OpenClaw WhatsApp stderr:',
-        stderr
-      );
+      console.warn("OpenClaw WhatsApp stderr:", stderr);
     }
 
-    const messageIdMatch =
-      stdout.match(/Message ID:\s*(.+)/i);
+    const messageIdMatch = stdout.match(/Message ID:\s*(.+)/i);
 
     return {
       success: true,
-      messageId:
-        messageIdMatch?.[1]?.trim() ?? null,
-      output: stdout.trim()
+
+      messageId: messageIdMatch?.[1]?.trim() ?? null,
+
+      output: stdout.trim(),
     };
   }
 }

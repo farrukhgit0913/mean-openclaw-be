@@ -1,14 +1,23 @@
 import express from "express";
+
 import cors from "cors";
+
 import helmet from "helmet";
+
 import morgan from "morgan";
+
 import path from "path";
+
 import mongoose from "mongoose";
 
 import { OpenClawService } from "./integrations/openclaw/openclaw.service.js";
+
 import { WhatsAppMessage } from "./models/whatsapp-message.model.js";
+
 import { getIO } from "./socket.js";
 
+import agentRoutes from "./routes/agent.routes.js";
+import crmRoutes from './routes/openclaw/crm.routes.js';
 const app = express();
 
 /**
@@ -42,6 +51,7 @@ app.use(
  */
 
 app.use(express.json());
+
 app.use(morgan("dev"));
 
 /**
@@ -50,11 +60,19 @@ app.use(morgan("dev"));
  * ============================================================
  */
 
-app.use(express.static(path.join(process.cwd(), "public")));
+app.use(
+  express.static(
+    path.join(process.cwd(), "public"),
+  ),
+);
 
 app.get("/", (_req, res) => {
   res.sendFile(
-    path.join(process.cwd(), "public", "index.html"),
+    path.join(
+      process.cwd(),
+      "public",
+      "index.html",
+    ),
   );
 });
 
@@ -64,7 +82,8 @@ app.get("/", (_req, res) => {
  * ============================================================
  */
 
-const openClawService = new OpenClawService();
+const openClawService =
+  new OpenClawService();
 
 /**
  * ============================================================
@@ -72,20 +91,23 @@ const openClawService = new OpenClawService();
  * ============================================================
  */
 
-app.get("/api/health", (_req, res) => {
-  const mongodbConnected =
-    mongoose.connection.readyState === 1;
+app.get(
+  "/api/health",
+  (_req, res) => {
+    const mongodbConnected =
+      mongoose.connection.readyState === 1;
 
-  res.json({
-    success: true,
-    backend: true,
-    mongodb: mongodbConnected,
-    openclaw: null,
-    message: mongodbConnected
-      ? "Backend and MongoDB are connected"
-      : "Backend is running but MongoDB is not connected",
-  });
-});
+    res.json({
+      success: true,
+      backend: true,
+      mongodb: mongodbConnected,
+      openclaw: null,
+      message: mongodbConnected
+        ? "Backend and MongoDB are connected"
+        : "Backend is running but MongoDB is not connected",
+    });
+  },
+);
 
 /**
  * ============================================================
@@ -93,26 +115,31 @@ app.get("/api/health", (_req, res) => {
  * ============================================================
  */
 
-app.get("/api/openclaw/models", async (_req, res) => {
-  try {
-    const models = await openClawService.getModels();
+app.get(
+  "/api/openclaw/models",
+  async (_req, res) => {
+    try {
+      const models =
+        await openClawService.getModels();
 
-    return res.json({
-      success: true,
-      data: models,
-    });
-  } catch (error) {
-    console.error(
-      "OpenClaw models error:",
-      error,
-    );
+      return res.json({
+        success: true,
+        data: models,
+      });
+    } catch (error) {
+      console.error(
+        "OpenClaw models error:",
+        error,
+      );
 
-    return res.status(500).json({
-      success: false,
-      message: "Failed to communicate with OpenClaw",
-    });
-  }
-});
+      return res.status(500).json({
+        success: false,
+        message:
+          "Failed to communicate with OpenClaw",
+      });
+    }
+  },
+);
 
 /**
  * ============================================================
@@ -120,39 +147,76 @@ app.get("/api/openclaw/models", async (_req, res) => {
  * ============================================================
  */
 
-app.post("/api/openclaw/chat", async (req, res) => {
-  try {
-    const { message } = req.body;
+app.post(
+  "/api/openclaw/chat",
+  async (req, res) => {
+    try {
+      const { message } =
+        req.body;
 
-    if (
-      !message ||
-      typeof message !== "string"
-    ) {
-      return res.status(400).json({
+      if (
+        !message ||
+        typeof message !== "string"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "message is required",
+        });
+      }
+
+      const response =
+        await openClawService.chat(
+          message,
+        );
+
+      return res.json({
+        success: true,
+        data: response,
+      });
+    } catch (error) {
+      console.error(
+        "OpenClaw chat error:",
+        error,
+      );
+
+      return res.status(500).json({
         success: false,
-        message: "message is required",
+        message:
+          "Failed to communicate with OpenClaw",
       });
     }
+  },
+);
 
-    const response =
-      await openClawService.chat(message);
+/**
+ * ============================================================
+ * DEMO #2 — AI BUSINESS AGENT
+ * ============================================================
+ *
+ * The AI agent can decide which backend tools to call.
+ *
+ * Example:
+ *
+ * User:
+ *   "How many customers do we have?"
+ *
+ * OpenClaw:
+ *   → getCustomerCount()
+ *
+ * Backend:
+ *   → MongoDB
+ *
+ * Result:
+ *   → OpenClaw
+ *   → Angular
+ *
+ */
 
-    return res.json({
-      success: true,
-      data: response,
-    });
-  } catch (error) {
-    console.error(
-      "OpenClaw chat error:",
-      error,
-    );
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to communicate with OpenClaw",
-    });
-  }
-});
+app.use(
+  "/api/openclaw/agent",
+  agentRoutes,
+);
 
 /**
  * ============================================================
@@ -164,7 +228,10 @@ app.post(
   "/api/openclaw/whatsapp/send",
   async (req, res) => {
     try {
-      const { to, message } = req.body;
+      const {
+        to,
+        message,
+      } = req.body;
 
       if (
         !to ||
@@ -172,7 +239,8 @@ app.post(
       ) {
         return res.status(400).json({
           success: false,
-          message: "to is required",
+          message:
+            "to is required",
         });
       }
 
@@ -182,16 +250,21 @@ app.post(
       ) {
         return res.status(400).json({
           success: false,
-          message: "message is required",
+          message:
+            "message is required",
         });
       }
 
       /**
        * WhatsApp phone number in E.164 format.
-       * Example: +923062762437
+       *
+       * Example:
+       * +923062762437
        */
 
-      if (!/^\+\d{8,15}$/.test(to)) {
+      if (
+        !/^\+\d{8,15}$/.test(to)
+      ) {
         return res.status(400).json({
           success: false,
           message:
@@ -234,7 +307,8 @@ app.post(
   "/api/openclaw/whatsapp/inbound",
   async (req, res) => {
     try {
-      const payload = req.body;
+      const payload =
+        req.body;
 
       const message =
         payload?.message;
@@ -251,7 +325,8 @@ app.post(
 
       if (
         message?.role !== "user" ||
-        typeof message?.content !== "string"
+        typeof message?.content !==
+          "string"
       ) {
         return res.status(400).json({
           success: false,
@@ -265,7 +340,8 @@ app.post(
        */
 
       if (
-        transport?.channel !== "whatsapp"
+        transport?.channel !==
+        "whatsapp"
       ) {
         return res.status(400).json({
           success: false,
@@ -280,14 +356,16 @@ app.post(
 
       const from =
         openClaw?.senderId ??
-        payload?.session?.origin?.from;
+        payload?.session?.origin
+          ?.from;
 
       /**
        * Our WhatsApp number.
        */
 
       const to =
-        process.env.OPENCLAW_WHATSAPP_SELF_NUMBER;
+        process.env
+          .OPENCLAW_WHATSAPP_SELF_NUMBER;
 
       if (!from || !to) {
         return res.status(400).json({
@@ -323,25 +401,34 @@ app.post(
             data: {
               _id:
                 existing._id.toString(),
+
               direction:
                 existing.direction,
+
               from:
                 existing.from,
+
               to:
                 existing.to,
+
               message:
                 existing.message,
+
               timestamp:
                 existing.timestamp.getTime(),
+
               messageId:
                 existing.messageId ??
                 null,
+
               senderName:
                 existing.senderName ??
                 null,
+
               sessionKey:
                 existing.sessionKey ??
                 null,
+
               channel:
                 existing.channel,
             },
@@ -353,35 +440,37 @@ app.post(
        * Normalize the OpenClaw event.
        */
 
-      const normalizedMessage = {
-        direction: "inbound" as const,
+      const normalizedMessage =
+        {
+          direction:
+            "inbound" as const,
 
-        from,
+          from,
 
-        to,
+          to,
 
-        message:
-          message.content,
+          message:
+            message.content,
 
-        timestamp:
-          new Date(
-            message.timestamp ??
-            Date.now(),
-          ),
+          timestamp:
+            new Date(
+              message.timestamp ??
+                Date.now(),
+            ),
 
-        messageId,
+          messageId,
 
-        senderName:
-          openClaw?.senderName ??
-          undefined,
+          senderName:
+            openClaw?.senderName ??
+            undefined,
 
-        sessionKey:
-          payload?.sessionKey ??
-          undefined,
+          sessionKey:
+            payload?.sessionKey ??
+            undefined,
 
-        channel:
-          "whatsapp" as const,
-      };
+          channel:
+            "whatsapp" as const,
+        };
 
       /**
        * Save to MongoDB.
@@ -397,40 +486,41 @@ app.post(
        * for Socket.IO / Angular.
        */
 
-      const socketMessage = {
-        _id:
-          savedMessage._id.toString(),
+      const socketMessage =
+        {
+          _id:
+            savedMessage._id.toString(),
 
-        direction:
-          savedMessage.direction,
+          direction:
+            savedMessage.direction,
 
-        from:
-          savedMessage.from,
+          from:
+            savedMessage.from,
 
-        to:
-          savedMessage.to,
+          to:
+            savedMessage.to,
 
-        message:
-          savedMessage.message,
+          message:
+            savedMessage.message,
 
-        timestamp:
-          savedMessage.timestamp.getTime(),
+          timestamp:
+            savedMessage.timestamp.getTime(),
 
-        messageId:
-          savedMessage.messageId ??
-          null,
+          messageId:
+            savedMessage.messageId ??
+            null,
 
-        senderName:
-          savedMessage.senderName ??
-          null,
+          senderName:
+            savedMessage.senderName ??
+            null,
 
-        sessionKey:
-          savedMessage.sessionKey ??
-          null,
+          sessionKey:
+            savedMessage.sessionKey ??
+            null,
 
-        channel:
-          savedMessage.channel,
-      };
+          channel:
+            savedMessage.channel,
+        };
 
       console.log(
         "WhatsApp inbound saved:",
@@ -459,7 +549,9 @@ app.post(
        * Duplicate MongoDB message.
        */
 
-      if (error?.code === 11000) {
+      if (
+        error?.code === 11000
+      ) {
         return res.json({
           success: true,
           duplicate: true,
@@ -504,42 +596,43 @@ app.get(
       return res.json({
         success: true,
 
-        data: messages.map(
-          (message) => ({
-            _id:
-              message._id.toString(),
+        data:
+          messages.map(
+            (message) => ({
+              _id:
+                message._id.toString(),
 
-            direction:
-              message.direction,
+              direction:
+                message.direction,
 
-            from:
-              message.from,
+              from:
+                message.from,
 
-            to:
-              message.to,
+              to:
+                message.to,
 
-            message:
-              message.message,
+              message:
+                message.message,
 
-            timestamp:
-              message.timestamp.getTime(),
+              timestamp:
+                message.timestamp.getTime(),
 
-            messageId:
-              message.messageId ??
-              null,
+              messageId:
+                message.messageId ??
+                null,
 
-            senderName:
-              message.senderName ??
-              null,
+              senderName:
+                message.senderName ??
+                null,
 
-            sessionKey:
-              message.sessionKey ??
-              null,
+              sessionKey:
+                message.sessionKey ??
+                null,
 
-            channel:
-              message.channel,
-          }),
-        ),
+              channel:
+                message.channel,
+            }),
+          ),
       });
     } catch (error) {
       console.error(
@@ -556,6 +649,13 @@ app.get(
   },
 );
 
+/**
+ * ============================================================
+ * OpenClaw CRM Route
+ * ============================================================
+ */
+
+app.use('/api/openclaw/crm', crmRoutes);
 /**
  * ============================================================
  * EXPORT
